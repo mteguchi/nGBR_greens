@@ -33,9 +33,9 @@ R3.N$time <- 1:dim(All.N)[1]
 R4.N <- data.frame(results.all$results[, , "Region 4 (Unknow"])
 R4.N$time <- 1:dim(All.N)[1]
 
-all.df <- list('ALL' = All.N, 'Region 1' = R1.N,
-               'Region 2' = R2.N, 'Region 3' = R3.N,
-               'Region 4' = R4.N)
+all.df <- list('Base - All' = All.N, 'Base - Region 1' = R1.N,
+               'Base - Region 2' = R2.N, 'Base - Region 3' = R3.N,
+               'Base - Region 4' = R4.N)
 
 plots <- vector(mode = "list",
                 length = length(all.df) )
