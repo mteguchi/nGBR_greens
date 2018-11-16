@@ -20,14 +20,16 @@ tBegin <- Sys.time()
 
 #nPops <- 4
 #results.dir <- 'data/Base Models/'
-#results.file <- "Base1.0_SD10.mp"  # these don't have stages... 
+#results.file <- "Base1.0_SD10.mp"  # these don't have stages... Use plot_results_base_mptools.R
 
 # results.file <- 'Extreme_Climate.mp'
 results.dir <- 'data/Climate Models/'
+
+# uncomment one of the following lines and source this script
 #results.file <- 'Extreme_Climate_M55F.mp'
 #results.file <- 'Extreme_Climate_M30F_harvest.mp'
-results.file <- 'Moderate_Climate 10FperM.mp'
-#results.file <- 'Extreme_Climate_M30F_harvest3000af3000sa.mp'
+#results.file <- 'Moderate_Climate 10FperM.mp'
+results.file <- 'Extreme_Climate_M30F_harvest3000af3000sa.mp'
 
 climate.txt <- strsplit(results.file, "_")[[1]][1]
 
@@ -119,8 +121,8 @@ for (k in 1:length(stage.data.region)){
                    shape = Sex),
                size = 3) +
     scale_shape_manual(breaks = c('Female', 'Male'),
-                       values = c(17, 15)) +  # filled triangle and filled square
-    #geom_line(aes(x = time, y = adm),
+                       values = c("Female" = 16, 
+                                  "Male" = 17)) + #geom_line(aes(x = time, y = adm),
     #          size = 3, color = 'black') +
     theme(plot.title = element_text(hjust = 0.5),
           axis.title = element_text(size = 12),
@@ -163,7 +165,8 @@ p1 <- ggplot(data = plot.data.1) +
                  shape = Sex),
              size = 3) +
   scale_shape_manual(breaks = c('Female', 'Male'),
-                     values = c(17, 15)) +  # filled triangle and filled square
+                     values = c("Female" = 16, 
+                                "Male" = 17)) +
   #geom_line(aes(x = time, y = adm),
   #          size = 3, color = 'black') +
   theme(plot.title = element_text(hjust = 0.5),
@@ -200,8 +203,8 @@ p2 <- ggplot(data = plot.data.2) +
                  shape = sex),
              size = 3) +
   scale_shape_manual(breaks = c('Female', 'Male'),
-                     values = c(17, 15)) +  # filled triangle and filled square
-  #geom_line(aes(x = time, y = adm),
+                     values = c("Female" = 16, 
+                                "Male" = 17)) +  #geom_line(aes(x = time, y = adm),
   #          size = 3, color = 'black') +
   theme(plot.title = element_text(hjust = 0.5),
         axis.title = element_text(size = 12),

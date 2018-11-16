@@ -16,8 +16,17 @@ runDate <- Sys.Date()
 tBegin <- Sys.time()
 
 #nPops <- 4
-results.dir <- 'data/Base Models/'
-results.file <- 'Base1.0_SD10_02012017.mp'
+#results.dir <- 'data/Base Models/'
+#results.file <- 'Base1.0_SD10_02012017.mp'
+
+# results.dir <- 'data/Harvest Models/'
+# results.file <- 'Harvest_6000AF__1.0_SD10.mp'
+
+results.dir <- 'data/Climate Models/'
+#results.file <- "Extreme_Climate_add_30000neM.mp"
+results.file <- "Extreme_Climate_add_60000neM.mp"
+
+
 file.base <- unlist(strsplit(results.file, split = '.mp'))
 results.all <- results(paste0(results.dir, results.file))
 
@@ -44,12 +53,12 @@ for (k in 1:length(all.df)){
   plots[[k]] <- ggplot(data = all.df[[k]]) +
     labs(title = names(all.df)[k],
          x = 'Time', y = 'Abundance') +
-    geom_ribbon(aes(x=time, ymax = max, ymin = min),
+    geom_ribbon(aes(x=time, ymax = log10(max), ymin = log10(min)),
                 alpha = 0.5, fill = 'gray') +
-    geom_line(aes(x = time, y = mean),
+    geom_line(aes(x = time, y = log10(mean)),
               size = 3, color = 'black') +
-    geom_line(aes(x = time, y = min), size = 2) +
-    geom_line(aes(x = time, y = max), size = 2) +
+    geom_line(aes(x = time, y = log10(min)), size = 2) +
+    geom_line(aes(x = time, y = log10(max)), size = 2) +
 
     theme(legend.position = c(0.9, 0.5),
           plot.title = element_text(hjust = 0.5),

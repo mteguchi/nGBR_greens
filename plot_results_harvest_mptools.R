@@ -7,94 +7,63 @@
 rm(list=ls())
 library(ggplot2)
 library(reshape2)
+library(mptools)
+library(dplyr)
+
+source("nGBR_greens_fcns.R")
 
 results.dir <- 'data/Harvest Models/'
 
-# data were extracted from the .mp files using Matlab:
-stageNames <- c('nef', 'pjf', 'bjf', 'saf', 'maf', 'adf',
-                'nem', 'pjm', 'bjm', 'sam', 'mam', 'adm')
+results.file <- "Harvest_6000AF__1.0_SD10.mp"
+#results.file <- "Harvest_6000AF_1.04_SD10_02012017.mp"
+#results.file <- "Harvest_3000AF_SA_1.0_SD10.mp"
 
+title.txt <- strsplit(results.file, ".mp")[[1]]
 stageNames.title <- c('Hatchling', 'Pelagic juvenile',
                       'Benthic juvenile', 'Subadult',
-                      'Maturing adult', 'Adult')
+                      'Maturing adult', 'Adult', "All")
 
-F0 <- dir(results.dir)
-F1 <- F0[grep('_02012017_', F0)]
+stages <- c('ne', 'pj', 'bj', 'sa', 'ma', 'ad', "all")
 
-# dat <- vector(mode = "list",
-#               length = length(F1))
+out.list <- prep_mpfile(results.dir, results.file)
 
-plots <- vector(mode = "list",
-                length = length(F1) )
-k <- 1
-for (k in 1:length(F1)){
-  pop <- unlist(strsplit(unlist(strsplit(unlist(strsplit(F1[k],
-                                                         '_02012017_'))[2],
-                                         '.csv')), 'pop'))[2]
+Region.names <- levels(out.list$dat$region)
 
-  datafile <- paste0(results.dir, F1[k])
-  dat0 <- read.csv(file = datafile, header = F)
-  colnames(dat0) <- stageNames
-  dat <- dat0[3:dim(dat0)[1],]  # why start from 3? matches with 0 to 200 by 5
-  dat$time <- seq(from = 0, to = 200, by = 5)
-  #df1 <- dat[[k]]
 
-  if (length(grep('3000AF_1000AM', F1[k])) == 1){
-    trtmt <- 'Hvt-3000AdF, 3000AdM'
-  } else if (length(grep('3000AF_300AM', F1[k])) == 1) {
-    trtmt <- 'Hvt-3000AdF, 300AdM'
-  } else if (length(grep('3000AF_AM', F1[k])) == 1){
-    trtmt <- 'Hvt-3000AdF, 3000AdM'
-  } else if (length(grep('4000AF', F1[k])) == 1){
-    trtmt <- 'Hvt-4000AdF'
-  } else if (length(grep('6000AF__1.0', F1[k])) == 1){
-    trtmt <- 'Hvt-6000AdF'
-  } else if (length(grep('6000AF_1.04', F1[k])) == 1){
-    trtmt <- 'Hvt(+7)-6000AdF'
-  } else if (length(grep('3000AF_SA', F1[k])) == 1){
-    trtmt <- 'Hvt-3000AdF, 3000SubAd'
+# plots <- vector(mode = "list",
+#                 length = length(stageNames.title) )
+
+k <- k1 <- 1
+for (k1 in 1:length(stages)){
+  
+  df2 <- out.list$df1[, c(stages[k1], "time", "region", "sex")]
+  
+  colnames(df2) <- c('abundance', 'time', "region", 'sex')
+  
+  for (k in 1:length(Region.names)){
+    
+    plot.R <- ggplot(data = filter(df2, region == Region.names[k])) +
+      labs(title = paste0(title.txt,  
+                          ': ', Region.names[k], 
+                          " (", stageNames.title[k1], ")"),
+           x = 'Time', y = 'log10(Abundance)') +
+      geom_point(aes(x = time,
+                     y = log10(abundance),
+                     shape = sex),
+                 size = 3) +
+      scale_shape_manual(breaks = c('Female', 'Male'),
+                         values = c("Female" = 16, 
+                                    "Male" = 17)) + 
+      #scale_shape(solid = TRUE) +
+      
+      theme(legend.position = c(0.9, 0.8),
+            plot.title = element_text(hjust = 0.5))
+    
+    ggsave(paste0('figures/', title.txt, "_", stageNames.title[k1],
+                  "_", Region.names[k], '.png'),
+           dpi = 600)
   }
-
-  df1.f <- dat[, c('nef', 'pjf', 'bjf', 'saf', 'maf', 'adf', 'time')]
-  df1.f$sex <- "Female"
-  colnames(df1.f) <- c('ne', 'pj', 'bj', 'sa', 'ma', 'ad', 'time', 'sex')
-
-  df1.m <- dat[, c('nem', 'pjm', 'bjm', 'sam', 'mam', 'adm', 'time')]
-  df1.m$sex <- "Male"
-  colnames(df1.m) <- c('ne', 'pj', 'bj', 'sa', 'ma', 'ad', 'time', 'sex')
-
-  df1 <- rbind(df1.f, df1.m)
-  df1$sex <- as.factor(df1$sex)
-  k1 <- 6
-  for (k1 in 1:6){
-    if (k1 == 6){
-      df2 <- df1[, c(k1, 7, 8)]
-
-      colnames(df2) <- c('abundance', 'time', 'sex')
-
-      plots <- ggplot(data = df2) +
-        labs(title = paste0(trtmt,  ': Region ', pop),
-             x = 'Time', y = 'Abundance') +
-        geom_point(aes(x = time,
-                       y = abundance,
-                       shape = sex),
-                   size = 3) +
-        scale_shape_manual(breaks = c('Female', 'Male'),
-                           values = c(17, 15)) +  # filled triangle and filled square
-
-        #scale_shape(solid = TRUE) +
-
-        theme(legend.position = c(0.9, 0.5),
-              plot.title = element_text(hjust = 0.5))
-
-
-      ggsave(paste0('figures/', stageNames.title[k1], '_Region', pop,
-                    '_Climate_', trtmt, '_Feb2017.png'),
-             dpi = 600)
-
-    }
-
-  }
-
+  
 }
+
 
