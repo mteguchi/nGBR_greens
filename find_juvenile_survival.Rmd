@@ -1,0 +1,67 @@
+---
+title: "Reanalysis of nGBR harvest models"
+output: html_notebook
+---
+
+This document describes the analysis of computing the missing juvenile survival and transition probabilities for green turtles in nGBR. 
+
+```{r}
+# Ts is the stage durations of various juvenile stages  (T in Caswell's book) - the last stage is assumed to be subadults, so their fecundity is not zero.
+# VT is a vector variances of stage durations
+# f is a vector of fecundities
+define.matrix <- function(Ts = c(5, 5, 3), VT = c(1, 1, 1), f = c(65, 75), phi.1 = 0.3, phi.J = c(0.6, 0.7, 0.8), phi.A = 0.95){
+  gam <- Ts/(VT + Ts)
+  k <- round((Ts^2) / (VT + Ts))
+  M.dim <- sum(k) + 2
+  
+  # juvenile stages (ks) + adult stages (length of fecundity) + first year
+  M <- matrix(data = 0, 
+              nrow = M.dim, 
+              ncol = M.dim)
+  
+  for (j in 1:length(f)){
+    M[1, (M.dim - j + 1)] <- f[length(f) - j + 1]
+  }
+
+  #M[1, (M.dim-1)] <- f[1]
+  #M[1, M.dim] <- f[2]
+  M[2, 1] <- phi.1
+  M[M.dim, M.dim] <- phi.A
+
+  l <- 1  
+  for (j in 1:length(k)){
+    for (i in 1:k[j]){
+      M[(l + 1), (l + 1)] <- phi.J[j] * (1 - gam[j])
+      M[(l + 2), (l + 1)] <- phi.J[j] * gam[j]
+      l <- l + 1
+    }
+    
+  }
+
+  eig1 <- eigen(M)
+  
+  return(list(k = k,
+              gam = gam,
+              M = M,
+              eigen1 = eig1$values[1]))
+}
+
+
+```
+
+Next, create an objective function to find juvenile survival rates with constraints
+
+```{r}
+library(nloptr)
+Ts <-  c(5, 5, 3) 
+VT <-  c(1, 1, 1) 
+f <-  c(65, 75) 
+phi.1 <-  0.3
+phi.A <- 0.95
+
+
+
+
+
+```
+
