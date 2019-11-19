@@ -73,19 +73,19 @@ Next, create an objective function to find juvenile survival rates with constrai
 
 ```{r}
 # objective function
-obj.fcn <- function(x){
-  M <- define.matrix(Ts = in.list$Ts, VT = in.list$VT, 
-                     f = in.list$f, phi.1 = in.list$phi.1, 
-                     phi.J = x, phi.A = in.list$phi.A)
-  
-  eig.1 <- M$eigen1
-  
-  return(abs(eig.1 - in.list$lambda))
-}
-
-eval_g0 <- function(x){
-  return(matrix(c(1,-1,0,0,1,-1), nrow = 2, ncol = 3) %*% c(x[1], x[2], x[3]))
-}
+# obj.fcn <- function(x){
+#   M <- define.matrix(Ts = in.list$Ts, VT = in.list$VT, 
+#                      f = in.list$f, phi.1 = in.list$phi.1, 
+#                      phi.J = x, phi.A = in.list$phi.A)
+#   
+#   eig.1 <- M$eigen1
+#   
+#   return(abs(eig.1 - in.list$lambda))
+# }
+# 
+# eval_g0 <- function(x){
+#   return(matrix(c(1,-1,0,0,1,-1), nrow = 2, ncol = 3) %*% c(x[1], x[2], x[3]))
+# }
 
 # the inequality constraints didn't work so well in nloptr package.
 # estim <- nloptr(x0 = c(0.5, 0.7, 0.9),
