@@ -12,35 +12,41 @@ library(tidyverse)
 
 Define functions first. 
 
+Our model has 6 stages (email from NF on 2019-11-19)
+1- neonate to 1 year (eggs, hatchlings, post hatchlings)
+2- pelagic juveniles
+3- benthic juveniles (up to 65cm)
+4- subadults (>65 cm to 86cm)
+5- maturing adults (>85 to 95 cm)
+6- adults (>95 cm)
+
 ```{r}
 # Create a function to define Lefkovitch matrix. 
-# Ts is the stage durations of various juvenile stages  (T in Caswell's book) - the last stage is assumed to be subadults, so their fecundity is not zero.
+# Ts is the stage durations of various juvenile stages  (T in Caswell's book) - the last stage is assumed to be maturing adults, so their fecundity is not zero.
 # VT is a vector variances of stage durations
 # f is a vector of fertilities (this excludes the survival of adult): only two are allowed
-define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A){
+# only maturing adults (MA) and adults (A) breed. 
+# phi.J includes pelagic juvenile, neritic juvenile, subadult, and maturing adult stages. 
+# p.breed is a vector of proportions of maturing - same length as f
+define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
   gam <- Ts/(VT + Ts)   # probability of moving to the next stage.
   k <- round((Ts^2) / (VT + Ts))
   M.dim <- sum(k) + 2
   
-  # juvenile stages (ks) + adult stages (length of fecundity) + first year
+  # juvenile + subadult stages + maturing adults (ks) + adult stages (length of fecundity) + first year
   M <- matrix(data = 0, 
               nrow = M.dim, 
               ncol = M.dim)
   
-  # for (j in 1:length(f)){
-  #   M[1, (M.dim - j + 1)] <- f[length(f) - j + 1] 
-  # }
-  
   # all pseudo stages for the maturing adult stage need to reproduce (Caswell 2001, p. 165)
-  # fertility x survival
-  M[1, M.dim] <- f[2] * phi.A
-  M[1, (M.dim - k[length(Ts)]):(M.dim - 1)] <- f[1] * phi.J[length(phi.J)]
+  # fertility needs survival for the post-breeding census
+  M[1, M.dim] <- f[2] * phi.A * p.breed[2]  # adults
+  M[1, (M.dim - k[length(Ts)]):(M.dim - 1)] <- f[1] * phi.J[length(phi.J)] * p.breed[1] 
   
-  #M[1, (M.dim-1)] <- f[1]
-  #M[1, M.dim] <- f[2]
   M[2, 1] <- phi.1
   M[M.dim, M.dim] <- phi.A
 
+  # fill in two rows for each column staying (1 - gam) and leaving (gam)
   l <- 1  
   for (j in 1:length(k)){
     for (i in 1:k[j]){
@@ -51,8 +57,10 @@ define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A){
     
   }
 
+  # compute eigenvalues
   eig1 <- eigen(M)
   
+  # return stuff.
   return(list(k = k,
               gam = gam,
               phi.J = phi.J,
@@ -85,18 +93,24 @@ define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A){
 # Using Rsolnp package - this seems to work better. in.list needs to be available in the workspace.
 
 obj.fcn <- function(x){
-  M <- define.matrix(Ts = in.list$Ts, VT = in.list$VT, 
-                     f = in.list$f, phi.1 = in.list$phi.1, 
-                     phi.J = x, phi.A = in.list$phi.A)
+  M <- define.matrix(Ts = in.list$Ts, 
+                     VT = in.list$VT, 
+                     f = in.list$f, 
+                     phi.1 = in.list$phi.1, 
+                     phi.J = x, 
+                     phi.A = in.list$phi.A,
+                     p.breed = in.list$p.breed)
   
   eig.1 <- M$eigen1
   
   return(abs(eig.1 - in.list$lambda))
 }
 
+# Differences of survival rates between two subsequent stages
+# are always negative = increasing survival rates
 eval_g0 <- function(x){
   
-  return(c(x[1] - x[2], x[2] - x[3]))
+  return(c(x[1] - x[2], x[2] - x[3], x[3] - x[4]))
 }
 
 ```
@@ -110,6 +124,7 @@ All analyses were conducted in the statistical package R (v. 3.6.1, R Developmen
 
 In the negative binomial model of Caswell (2001), the mean and variance of stage durations are needed. We used the values found in published papers (mostly from one paper by Chaloupka M. 2002. Stohastic simulation modelling of southern Great Barrier Reef green turtle population dynamics. Ecological Modelling 148:79-109).  
 
+(The following was adapted from email from NF on 2019-11-18 and around that date.)
 ### Stage durations
 
 #### Age class 1: This first stage includes eggs, hatchlings, and neonates (until the end of the next nesting season). 
@@ -171,11 +186,11 @@ so survival  = 69%
 
 Although the post hatchling survival was determined to be 0.95 (SD = 0.01) in Chaloupka (2002), this value seems too optimistic because this is significantly higher than the next stage (0.65 SD = 0.005; Chaloupka 2002, Table 1).  I think it makes more sense to use the survival rate for the next stage (0.65) than using this arbitrary value. 
 
-Using all these information, we arrive at 0.445 (using the unlikely 0.95) or 0.30 (using the more likely but probably still too high 0.65). 
+Using all these information, we arrive at 0.445 (using the unlikely 0.95) or 0.3 (using the more likely but probably still too high at 0.64). 
 
 1 yr survival = 0.685 x 0.99 x 0.69 x 0.95 = 0.445
 
-1 yr survival = 0.685 x 0.99 x 0.69 x 0.65 = 0.304
+1 yr survival = 0.685 x 0.99 x 0.69 x 0.64 = 0.3
 
 #### Juvenile survival rates (Chaloupka 2002)
 
@@ -208,14 +223,16 @@ nests/female = 6.2  (Raine Is, Limpus et al 2003)
 
 remigation interval = 5.35 yr  (Raine Is, Limpus et al 2003)
 
-#### First year breeder
-The fecundity for the first year breeder is computed as the following: Eggs/nests (103.9) x nests/female (6.2) x proportion of the 1st year breeder that nest (0.125) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
+#### First year breeder (a.k.a., maturing adult)
+The fecundity for the maturing adult stage is computed as the following: Eggs/nests (103.9) x nests/female (6.2) x (1/remigration interval) (1/5.35) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
 
-Base: 103.9 x 6.2 x 0.125 x 0.8 = 64.4
+Proportion of breeding females is included at the time of creating fertility later.
 
-Modelrate climate: 103.9 x 6.2 x 0.125 x 0.88 = 70.9
+Base: 103.9 x 6.2 x (1/5.35) x 0.8 = 96.3
 
-Extreme climate: 103.9 x 6.2 x 0.125 x 0.99 = 79.7
+Modelrate climate: 103.9 x 6.2 x (1/5.35) x 0.88 = 106.0
+
+Extreme climate: 103.9 x 6.2 x (1/5.35) x 0.99 = 119.2
 
 #### Adult
 For the adults, we replace the proportion of the 1st year breeder that nest with the remigration interval: Eggs/nests x nests/female x (1/remigration interval) (1/5.35) 
@@ -252,21 +269,22 @@ These bounds come from our knowledge of green turtles as well as common sense.
 
 ```{r message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(64.4, 96.3), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(96.3, 96.3), # 
                 phi.1 =  0.3,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 0.95)
 
 # find the juvenile survival and transition probabilities
 estim.base.095 <- gosolnp(fun = obj.fcn,
                           ineqfun = eval_g0,
-                          LB = c(0.1, 0.1, 0.5), 
-                          UB = c(0.8, 0.9, 0.95),
-                          ineqLB = c(-1.0, -1.0),
-                          ineqUB = c(0.0, 0.0),
-                          distr = c(1,1,1),
+                          LB = c(0.1, 0.1, 0.3, 0.5), 
+                          UB = c(0.8, 0.9, 0.95, 0.95),
+                          ineqLB = c(-1.0, -1.0, -1.0),
+                          ineqUB = c(0.0, 0.0, 0.0),
+                          distr = c(1,1,1,1),
                           control = list(outer.iter = 5000,
                                          inner.iter = 10000,
                                          tol = 1.0e-15,
@@ -283,30 +301,38 @@ M.base.095 <- define.matrix(Ts = in.list$Ts,
                             f = in.list$f, 
                             phi.1 = in.list$phi.1, 
                             phi.J = in.list$phi.J, 
-                            phi.A = in.list$phi.A)
+                            phi.A = in.list$phi.A,
+                            p.breed = in.list$p.breed)
 
-M.base.095
+write.table(M.base.095$M, 
+            file = "data/Base_095.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.base.095
 ```
 
 ### lambda = 1.00
 
 ```{r message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(64.4, 96.3), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(96.3, 96.3), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 1.00)
 
 # find the juvenile survival and transition probabilities
 estim.base.100 <- gosolnp(fun = obj.fcn,
                           ineqfun = eval_g0,
-                          LB = c(0.1, 0.1, 0.5), 
-                          UB = c(0.8, 0.9, 0.95),
-                          ineqLB = c(-1.0, -1.0),
-                          ineqUB = c(0.0, 0.0),
-                          distr = c(1,1,1),
+                          LB = c(0.1, 0.1, 0.3, 0.5), 
+                          UB = c(0.8, 0.9, 0.95, 0.95),
+                          ineqLB = c(-1.0, -1.0, -1.0),
+                          ineqUB = c(0.0, 0.0, 0.0),
+                          distr = c(1,1,1,1),
                           control = list(outer.iter = 5000,
                                          inner.iter = 10000,
                                          tol = 1.0e-15,
@@ -323,30 +349,38 @@ M.base.100 <- define.matrix(Ts = in.list$Ts,
                             f = in.list$f, 
                             phi.1 = in.list$phi.1, 
                             phi.J = in.list$phi.J, 
-                            phi.A = in.list$phi.A)
+                            phi.A = in.list$phi.A,
+                            p.breed = in.list$p.breed)
 
-M.base.100
+write.table(M.base.100$M, 
+            file = "data/Base_100.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.base.100
 ```
 
 ### lambda = 1.04
 
 ```{r echo=FALSE, message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(64.4, 96.3), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(96.3, 96.3), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 1.04)
 
 # find the juvenile survival and transition probabilities
 estim.base.104 <- gosolnp(fun = obj.fcn,
                           ineqfun = eval_g0,
-                          LB = c(0.1, 0.1, 0.5), 
-                          UB = c(0.8, 0.9, 0.95),
-                          ineqLB = c(-1.0, -1.0),
-                          ineqUB = c(0.0, 0.0),
-                          distr = c(1,1,1),
+                          LB = c(0.1, 0.1, 0.3, 0.5), 
+                          UB = c(0.8, 0.9, 0.95, 0.95),
+                          ineqLB = c(-1.0, -1.0, -1.0),
+                          ineqUB = c(0.0, 0.0, 0.0),
+                          distr = c(1,1,1,1),
                           control = list(outer.iter = 5000,
                                          inner.iter = 10000,
                                          tol = 1.0e-15,
@@ -363,9 +397,15 @@ M.base.104 <- define.matrix(Ts = in.list$Ts,
                             f = in.list$f, 
                             phi.1 = in.list$phi.1, 
                             phi.J = in.list$phi.J, 
-                            phi.A = in.list$phi.A)
+                            phi.A = in.list$phi.A,
+                            p.breed = in.list$p.breed)
 
-M.base.104
+write.table(M.base.104$M, 
+            file = "data/Base_104.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+#M.base.104
 ```
 
 ## Moderate climate case
@@ -375,21 +415,22 @@ In the moderate-climate case scenarios, we set the sex ratio to be 0.88.  Within
 
 ```{r message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(70.9, 106.0), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(106.0, 106.0), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 0.95)
 
 # find the juvenile survival and transition probabilities
 estim.moderate.095 <- gosolnp(fun = obj.fcn,
                               ineqfun = eval_g0,
-                              LB = c(0.1, 0.1, 0.5), 
-                              UB = c(0.8, 0.9, 0.95),
-                              ineqLB = c(-1.0, -1.0),
-                              ineqUB = c(0.0, 0.0),
-                              distr = c(1,1,1),
+                              LB = c(0.1, 0.1, 0.3, 0.5), 
+                              UB = c(0.8, 0.9, 0.95, 0.95),
+                              ineqLB = c(-1.0, -1.0, -1.0),
+                              ineqUB = c(0.0, 0.0, 0.0),
+                              distr = c(1,1,1,1),
                               control = list(outer.iter = 5000,
                                              inner.iter = 10000,
                                              tol = 1.0e-15,
@@ -406,30 +447,37 @@ M.moderate.095 <- define.matrix(Ts = in.list$Ts,
                                 f = in.list$f, 
                                 phi.1 = in.list$phi.1, 
                                 phi.J = in.list$phi.J, 
-                                phi.A = in.list$phi.A)
+                                phi.A = in.list$phi.A,
+                                p.breed = in.list$p.breed)
 
-M.moderate.095
+write.table(M.moderate.095$M, 
+            file = "data/Moderate_095.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+#M.moderate.095
 ```
 
 ### lambda = 1.00
 
 ```{r message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(70.9, 106.0), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(106.0, 106.0), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 1.00)
 
 # find the juvenile survival and transition probabilities
 estim.moderate.100 <- gosolnp(fun = obj.fcn,
                               ineqfun = eval_g0,
-                              LB = c(0.1, 0.1, 0.5), 
-                              UB = c(0.8, 0.9, 0.95),
-                              ineqLB = c(-1.0, -1.0),
-                              ineqUB = c(0.0, 0.0),
-                              distr = c(1,1,1),
+                              LB = c(0.1, 0.1, 0.3, 0.5), 
+                              UB = c(0.8, 0.9, 0.95, 0.95),
+                              ineqLB = c(-1.0, -1.0, -1.0),
+                              ineqUB = c(0.0, 0.0, 0.0),
+                              distr = c(1,1,1,1),
                               control = list(outer.iter = 5000,
                                              inner.iter = 10000,
                                              tol = 1.0e-15,
@@ -446,30 +494,38 @@ M.moderate.100 <- define.matrix(Ts = in.list$Ts,
                                 f = in.list$f, 
                                 phi.1 = in.list$phi.1, 
                                 phi.J = in.list$phi.J, 
-                                phi.A = in.list$phi.A)
+                                phi.A = in.list$phi.A,
+                                p.breed = in.list$p.breed)
 
-M.moderate.100
+write.table(M.moderate.100$M, 
+            file = "data/Moderate_100.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.moderate.100
 ```
 
 ### lambda = 1.04
 
 ```{r echo=FALSE, message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(70.9, 106.0), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1), # variance of years in two juvenile stages 
+                f =  c(106.0, 106.0), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 1.04)
 
 # find the juvenile survival and transition probabilities
 estim.moderate.104 <- gosolnp(fun = obj.fcn,
                               ineqfun = eval_g0,
-                              LB = c(0.1, 0.1, 0.5), 
-                              UB = c(0.8, 0.9, 0.95),
-                              ineqLB = c(-1.0, -1.0),
-                              ineqUB = c(0.0, 0.0),
-                              distr = c(1,1,1),
+                              LB = c(0.1, 0.1, 0.3, 0.5), 
+                              UB = c(0.8, 0.9, 0.95, 0.95),
+                              ineqLB = c(-1.0, -1.0, -1.0),
+                              ineqUB = c(0.0, 0.0, 0.0),
+                              distr = c(1,1,1,1),
                               control = list(outer.iter = 5000,
                                              inner.iter = 10000,
                                              tol = 1.0e-15,
@@ -486,9 +542,16 @@ M.moderate.104 <- define.matrix(Ts = in.list$Ts,
                                 f = in.list$f, 
                                 phi.1 = in.list$phi.1, 
                                 phi.J = in.list$phi.J, 
-                                phi.A = in.list$phi.A)
+                                phi.A = in.list$phi.A,
+                                p.breed = in.list$p.breed)
 
-M.moderate.104
+write.table(M.moderate.104$M, 
+            file = "data/Moderate_104.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.moderate.104
 ```
 
 
@@ -501,25 +564,26 @@ These bounds come from our knowledge of green turtles as well as common sense.
 
 ```{r message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(79.7, 119.2), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(119.2, 119.2), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 0.95)
 
 # find the juvenile survival and transition probabilities
 estim.extreme.095 <- gosolnp(fun = obj.fcn,
-                              ineqfun = eval_g0,
-                              LB = c(0.1, 0.1, 0.5), 
-                              UB = c(0.8, 0.9, 0.95),
-                              ineqLB = c(-1.0, -1.0),
-                              ineqUB = c(0.0, 0.0),
-                              distr = c(1,1,1),
-                              control = list(outer.iter = 5000,
-                                             inner.iter = 10000,
-                                             tol = 1.0e-15,
-                                             delta = 1.0e-12))
+                             ineqfun = eval_g0,
+                             LB = c(0.1, 0.1, 0.3, 0.5), 
+                             UB = c(0.8, 0.9, 0.95, 0.95),
+                             ineqLB = c(-1.0, -1.0, -1.0),
+                             ineqUB = c(0.0, 0.0, 0.0),
+                             distr = c(1,1,1,1),
+                             control = list(outer.iter = 5000,
+                                            inner.iter = 10000,
+                                            tol = 1.0e-15,
+                                            delta = 1.0e-12))
 
 ```
 
@@ -528,38 +592,46 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the nega
 ```{r}
 in.list$phi.J <- estim.extreme.095$pars
 M.extreme.095 <- define.matrix(Ts = in.list$Ts, 
-                                VT = in.list$VT, 
-                                f = in.list$f, 
-                                phi.1 = in.list$phi.1, 
-                                phi.J = in.list$phi.J, 
-                                phi.A = in.list$phi.A)
+                               VT = in.list$VT, 
+                               f = in.list$f, 
+                               phi.1 = in.list$phi.1, 
+                               phi.J = in.list$phi.J, 
+                               phi.A = in.list$phi.A,
+                               p.breed = in.list$p.breed)
 
-M.extreme.095
+write.table(M.extreme.095$M, 
+            file = "data/Extreme_095.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.extreme.095
 ```
 
 ### lambda = 1.00
 
 ```{r message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(79.7, 119.2), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(119.2, 119.2), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 1.00)
 
 # find the juvenile survival and transition probabilities
 estim.extreme.100 <- gosolnp(fun = obj.fcn,
-                              ineqfun = eval_g0,
-                              LB = c(0.1, 0.1, 0.5), 
-                              UB = c(0.8, 0.9, 0.95),
-                              ineqLB = c(-1.0, -1.0),
-                              ineqUB = c(0.0, 0.0),
-                              distr = c(1,1,1),
-                              control = list(outer.iter = 5000,
-                                             inner.iter = 10000,
-                                             tol = 1.0e-15,
-                                             delta = 1.0e-12))
+                             ineqfun = eval_g0,
+                             LB = c(0.1, 0.1, 0.3, 0.5), 
+                             UB = c(0.8, 0.9, 0.95, 0.95),
+                             ineqLB = c(-1.0, -1.0, -1.0),
+                             ineqUB = c(0.0, 0.0, 0.0),
+                             distr = c(1,1,1,1),
+                             control = list(outer.iter = 5000,
+                                            inner.iter = 10000,
+                                            tol = 1.0e-15,
+                                            delta = 1.0e-12))
 
 ```
 
@@ -568,38 +640,46 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the nega
 ```{r}
 in.list$phi.J <- estim.extreme.100$pars
 M.extreme.100 <- define.matrix(Ts = in.list$Ts, 
-                                VT = in.list$VT, 
-                                f = in.list$f, 
-                                phi.1 = in.list$phi.1, 
-                                phi.J = in.list$phi.J, 
-                                phi.A = in.list$phi.A)
+                               VT = in.list$VT, 
+                               f = in.list$f, 
+                               phi.1 = in.list$phi.1, 
+                               phi.J = in.list$phi.J, 
+                               phi.A = in.list$phi.A,
+                               p.breed = in.list$p.breed)
 
-M.extreme.100
+write.table(M.extreme.100$M, 
+            file = "data/Extreme_100.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.extreme.100
 ```
 
 ### lambda = 1.04
 
 ```{r echo=FALSE, message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2)),  # variance of years in two juvenile stages 
-                f =  c(79.7, 119.2), # 
+in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
+                VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
+                f =  c(119.2, 119.2), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
+                p.breed = c(0.12, 1.0),
                 lambda = 1.04)
 
 # find the juvenile survival and transition probabilities
 estim.extreme.104 <- gosolnp(fun = obj.fcn,
-                              ineqfun = eval_g0,
-                              LB = c(0.1, 0.1, 0.5), 
-                              UB = c(0.8, 0.9, 0.95),
-                              ineqLB = c(-1.0, -1.0),
-                              ineqUB = c(0.0, 0.0),
-                              distr = c(1,1,1),
-                              control = list(outer.iter = 5000,
-                                             inner.iter = 10000,
-                                             tol = 1.0e-15,
-                                             delta = 1.0e-12))
+                             ineqfun = eval_g0,
+                             LB = c(0.1, 0.1, 0.3, 0.5), 
+                             UB = c(0.8, 0.9, 0.95, 0.95),
+                             ineqLB = c(-1.0, -1.0, -1.0),
+                             ineqUB = c(0.0, 0.0, 0.0),
+                             distr = c(1,1,1,1),
+                             control = list(outer.iter = 5000,
+                                            inner.iter = 10000,
+                                            tol = 1.0e-15,
+                                            delta = 1.0e-12))
 
 ```
 
@@ -608,13 +688,20 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the nega
 ```{r}
 in.list$phi.J <- estim.extreme.104$pars
 M.extreme.104 <- define.matrix(Ts = in.list$Ts, 
-                                VT = in.list$VT, 
-                                f = in.list$f, 
-                                phi.1 = in.list$phi.1, 
-                                phi.J = in.list$phi.J, 
-                                phi.A = in.list$phi.A)
+                               VT = in.list$VT, 
+                               f = in.list$f, 
+                               phi.1 = in.list$phi.1, 
+                               phi.J = in.list$phi.J, 
+                               phi.A = in.list$phi.A,
+                               p.breed = in.list$p.breed)
 
-M.extreme.104
+write.table(M.extreme.104$M, 
+            file = "data/Extreme_104.csv",
+            row.names = F,
+            col.names = FALSE,
+            sep = ",")
+
+#M.extreme.104
 ```
 
 These are one of many possible combinations of survival rates.  
