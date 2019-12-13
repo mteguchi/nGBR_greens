@@ -20,14 +20,14 @@ Our model has 6 stages (email from NF on 2019-11-19)
 5- maturing adults (>85 to 95 cm)
 6- adults (>95 cm)
 
+Create a function to define Lefkovitch matrix. 
+Ts is the stage durations of various juvenile stages in years (T in Caswell's book) - the last juvenile stage is to be maturing adults, so their fecundity is not zero.
+VT is a vector of variances of stage durations
+f is a vector of fertilities (this excludes the survival of adult): only two are allowed, where only maturing adults (MA) and adults (A) breed. 
+phi.J includes pelagic juvenile, neritic juvenile, subadult, and maturing adult stages. 
+p.breed is a vector of proportions of maturing - same length as f
+
 ```{r}
-# Create a function to define Lefkovitch matrix. 
-# Ts is the stage durations of various juvenile stages  (T in Caswell's book) - the last stage is assumed to be maturing adults, so their fecundity is not zero.
-# VT is a vector variances of stage durations
-# f is a vector of fertilities (this excludes the survival of adult): only two are allowed
-# only maturing adults (MA) and adults (A) breed. 
-# phi.J includes pelagic juvenile, neritic juvenile, subadult, and maturing adult stages. 
-# p.breed is a vector of proportions of maturing - same length as f
 define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
   gam <- Ts/(VT + Ts)   # probability of moving to the next stage.
   k <- round((Ts^2) / (VT + Ts))
@@ -39,11 +39,16 @@ define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
               ncol = M.dim)
   
   # all pseudo stages for the maturing adult stage need to reproduce (Caswell 2001, p. 165)
-  # fertility needs survival for the post-breeding census
+  # fertility needs adult survival for the post-breeding census
   M[1, M.dim] <- f[2] * phi.A * p.breed[2]  # adults
+  
+  # fertility for maturing adults needs the final juvenile stage suvival
   M[1, (M.dim - k[length(Ts)]):(M.dim - 1)] <- f[1] * phi.J[length(phi.J)] * p.breed[1] 
   
+  # first-year survival
   M[2, 1] <- phi.1
+  
+  # adult survival at the end
   M[M.dim, M.dim] <- phi.A
 
   # fill in two rows for each column staying (1 - gam) and leaving (gam)
