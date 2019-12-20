@@ -1,5 +1,105 @@
 
+# Create a function to define Lefkovitch matrix using the negative binomial stage duration model. 
+# Ts is the stage durations of various juvenile stages in years (T in Caswell's book) - the last juvenile stage is to be maturing adults, so their fecundity is not zero.
+# 
+# VT is a vector of variances of stage durations
+# 
+# f is a vector of fertilities (this excludes the survival of adult): only two are allowed, where only maturing adults (MA) and adults (A) breed. 
+# 
+# phi.1 is the survival rate of the first year (eggs, hatchlings, and first year)
+# 
+# phi.J includes pelagic juvenile, neritic juvenile, subadult, and maturing adult stages. 
+# 
+# p.breed is a vector of proportions of females laying eggs - same length as f
 
+define.matrix.negbin <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
+  gam <- Ts/(VT + Ts)   # probability of moving to the next stage.
+  k <- round((Ts^2) / (VT + Ts))
+  M.dim <- sum(k) + 2
+  
+  # juvenile + subadult stages + maturing adults (ks) + adult stages (length of fecundity) + first year
+  M <- matrix(data = 0, 
+              nrow = M.dim, 
+              ncol = M.dim)
+  
+  # all pseudo stages for the maturing adult stage need to reproduce (Caswell 2001, p. 165)
+  # fertility needs adult survival for the post-breeding census
+  M[1, M.dim] <- f[2] * phi.A * p.breed[2]  # adults
+  
+  # fertility for maturing adults needs the final juvenile stage suvival
+  M[1, (M.dim - k[length(Ts)]):(M.dim - 1)] <- f[1] * phi.J[length(phi.J)] * p.breed[1] 
+  
+  # first-year survival
+  M[2, 1] <- phi.1
+  
+  # adult survival at the end
+  M[M.dim, M.dim] <- phi.A
+  
+  # fill in two rows for each column staying (1 - gam) and leaving (gam)
+  l <- 1  
+  for (j in 1:length(k)){
+    for (i in 1:k[j]){
+      M[(l + 1), (l + 1)] <- phi.J[j] * (1 - gam[j])
+      M[(l + 2), (l + 1)] <- phi.J[j] * gam[j]
+      l <- l + 1
+    }
+    
+  }
+  
+  # compute eigenvalues
+  eig1 <- eigen(M)
+  
+  # return stuff.
+  return(list(k = k,
+              gam = gam,
+              phi.J = phi.J,
+              M = M,
+              eigen1 = eig1$values[1]))
+}
+
+# Using Rsolnp package - this seems to work better. in.list needs to be available in the workspace.
+
+obj.fcn <- function(x){
+  M <- define.matrix.negbin(Ts = in.list$Ts, 
+                            VT = in.list$VT, 
+                            f = in.list$f, 
+                            phi.1 = in.list$phi.1, 
+                            phi.J = x, 
+                            phi.A = in.list$phi.A,
+                            p.breed = in.list$p.breed)
+  
+  eig.1 <- M$eigen1
+  
+  return(abs(eig.1 - in.list$lambda))
+}
+
+# Differences of survival rates between two subsequent stages
+# are always negative = increasing survival rates
+eval_g0 <- function(x){
+  
+  return(c(x[1] - x[2], x[2] - x[3], x[3] - x[4]))
+}
+
+# the inequality constraints didn't work so well in nloptr package.
+# estim <- nloptr(x0 = c(0.5, 0.7, 0.9),
+#                 eval_f = obj.fcn,
+#                 eval_g_ineq = eval_g0,
+#                 lb = c(0,0,0), 
+#                 ub = c(1.0,1.0,1.0),
+#                 opts = list("algorithm" = "NLOPT_LN_COBYLA",
+#                             "xtol_abs" = c(1.0e-18, 1.0e-18, 1.0e-18),
+#                             "maxeval" = 50000))
+
+#"NLOPT_LN_NELDERMEAD" - worked for without contraint
+#"NLOPT_GN_AGS" - does not work
+#"NLOPT_GN_ORIG_DIRECT" - didn't work so well. 
+#                            ,
+#                            "maxeval" = 10000
+
+# Tried to use matrix algebra but didn't work so well in nloptr package... 
+# eval_g0 <- function(x){
+#   return(matrix(c(1,-1,0,0,1,-1), nrow = 2, ncol = 3) %*% c(x[1], x[2], x[3]))
+# }
 
 
 prep_mpfile <- function(results.dir, results.file){
