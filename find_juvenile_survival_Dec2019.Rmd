@@ -39,8 +39,9 @@ phi.J includes pelagic juvenile, neritic juvenile, subadult, and maturing adult 
 
 p.breed is a vector of proportions of females laying eggs - same length as f
 
+The following functions can be used to compute survival and transition probabilities using the negative binomial stage durations. This approach, however, creates pseudo stages within each stage so that the resulting matrix becomes large. I used the next approach (variable stage durations) in Caswell's book (6.4.3, p. 162) instead.  
 ```{r}
-define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
+define.matrix.negbin <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
   gam <- Ts/(VT + Ts)   # probability of moving to the next stage.
   k <- round((Ts^2) / (VT + Ts))
   M.dim <- sum(k) + 2
@@ -110,13 +111,83 @@ define.matrix <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed){
 # Using Rsolnp package - this seems to work better. in.list needs to be available in the workspace.
 
 obj.fcn <- function(x){
-  M <- define.matrix(Ts = in.list$Ts, 
-                     VT = in.list$VT, 
-                     f = in.list$f, 
-                     phi.1 = in.list$phi.1, 
-                     phi.J = x, 
-                     phi.A = in.list$phi.A,
-                     p.breed = in.list$p.breed)
+  M <- define.matrix.negbin(Ts = in.list$Ts, 
+                            VT = in.list$VT, 
+                            f = in.list$f, 
+                            phi.1 = in.list$phi.1, 
+                            phi.J = x, 
+                            phi.A = in.list$phi.A,
+                            p.breed = in.list$p.breed)
+  
+  eig.1 <- M$eigen1
+  
+  return(abs(eig.1 - in.list$lambda))
+}
+
+# Differences of survival rates between two subsequent stages
+# are always negative = increasing survival rates
+eval_g0 <- function(x){
+  
+  return(c(x[1] - x[2], x[2] - x[3], x[3] - x[4]))
+}
+
+```
+
+Functions to compute survival and transition probabilities using variable stage durations. NOT DONE YET AS OF 12/19/2019. FINISH THIS. 
+```{r}
+
+define.matrix.varstage <- function(Ts, VT, f, phi.1, phi.J, phi.A, p.breed, lambda){
+  a <- log(lambda/phi.J)
+  gam <- (1/Ts) * exp(-a * ((Ts/2) - (VT/(2*Ts))))
+  
+  M.dim <- length(phi.J) + length(phi.A) + 1
+  # (juvenile + subadult stages + maturing adults) + adult stages (length of survival) + first year
+  M <- matrix(data = 0, 
+              nrow = M.dim, 
+              ncol = M.dim)
+  
+  # the maturing adult stage needs to reproduce (Caswell 2001, p. 165)
+  # fertility needs adult survival for the post-breeding census
+  M[1, M.dim] <- f[2] * phi.A * p.breed[2]  # adults
+  
+  # fertility for maturing adults needs the final juvenile stage suvival
+  M[1, (M.dim - 1)] <- f[1] * phi.J[length(phi.J)] * p.breed[1] 
+  
+  # first-year survival
+  M[2, 1] <- phi.1
+  
+  # adult survival at the end
+  M[M.dim, M.dim] <- phi.A
+
+  # fill in two rows for each column staying (1 - gam) and leaving (gam)
+  l <- 1  
+  for (j in 2:(M.dim-1)){
+    M[j, j] <- phi.J[j] * (1 - gam[j])
+    M[(j+1), j] <- phi.J[j] * gam[j]
+      
+  }
+
+  # compute eigenvalues
+  eig1 <- eigen(M)
+  
+  # return stuff.
+  return(list(a = a,
+              gam = gam,
+              phi.J = phi.J,
+              M = M,
+              eigen1 = eig1$values[1]))
+}
+
+
+obj.fcn.varstage <- function(x){
+  M <- define.matrix.varstage(Ts = in.list$Ts, 
+                              VT = in.list$VT, 
+                              f = in.list$f, 
+                              phi.1 = in.list$phi.1, 
+                              phi.J = x, 
+                              phi.A = in.list$phi.A,
+                              p.breed = in.list$p.breed,
+                              lambda = 1.0)
   
   eig.1 <- M$eigen1
   
@@ -246,6 +317,16 @@ Mick also estimated adult survival for Clack Reef based on the field data as 0.9
 
 End of NF comments
 
+I confine the parameter space for juvenile and subadult survival rates to the following:
+
+pelagic juvenile = [0.1, 0.8]
+
+benthic juvenile = [0.1, 0.9]
+
+subadult = [0.5, 0.95]
+
+I also restricted the survival rates to increase over these stages. 
+
 ### Fertility
 
 Fertility of green turtles is affected by the number of eggs per nest, the number of nests per female per nesting season, remigration intervals, and survival rates. The following values were used for this study.
@@ -270,7 +351,7 @@ Extreme climate: 103.9 x 6.2 x (1/5.35) x 0.99 = 119.2
 #### Adult
 For the adults, we replace the proportion of the 1st year breeder that nest with the remigration interval: Eggs/nest x nests/female x (1/remigration interval) (1/5.35) x sex ratio
 
-Base: 103.9 x 6.2 x (1/5.35) x 0.8 = 96.3
+Base: 103.9 x 6.2 x (1/5.35) x 0.8 = 96.3 (not used any longer)
 
 Moderate climate: 103.9 x 6.2 x (1/5.35) x 0.88 = 106.0
 
@@ -286,22 +367,12 @@ moderate climate: 88% female
 
 extreme climate: 99% female
 
-
-I confine the parameter space for juvenile and subadult survival rates to the following:
-pelagic juvenile = [0.1, 0.8]
-benthic juvenile = [0.1, 0.9]
-subadult = [0.5, 0.95]
-
-
 ## Base case (not used any longer)
 
 We decided that given what we know about the sex ratio, this case is not representative of the current situation. 
 
-In the base case scenarios, we set the sex ratio to be 0.8.  Within the base case, we evaulate three different growth rates (dominant eigenvalue); 0.95, 1.0, and 1.04. 
-
-
 ## Moderate climate case
-In the moderate-climate case scenarios, we set the sex ratio to be 0.88 and the growth rate to be 1.04. 
+In the moderate-climate case scenarios, we set the sex ratio to be 0.88 and the growth rate to be 1.04. Fecundity is computed as above and provided in in.list. f = 106.0
 
 ### lambda = 1.04
 
@@ -334,7 +405,7 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the nega
 
 ```{r}
 in.list$phi.J <- estim.moderate.104$pars
-M.moderate.104 <- define.matrix(Ts = in.list$Ts, 
+M.moderate.104 <- define.matrix.negbin(Ts = in.list$Ts, 
                                 VT = in.list$VT, 
                                 f = in.list$f, 
                                 phi.1 = in.list$phi.1, 
@@ -353,7 +424,8 @@ write.table(M.moderate.104$M,
 
 
 ## Extreme climate case
-In the moderate-climate case scenarios, we set the sex ratio to be 0.99 and the growth rate of 1.04. 
+
+In the extreme-climate case scenarios, we set the sex ratio to be 0.99 and the growth rate to be 1.04. Fecundity is computed as above and provided in in.list. f = 119.2
 
 ### lambda = 1.04
 
@@ -386,7 +458,7 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the nega
 
 ```{r}
 in.list$phi.J <- estim.extreme.104$pars
-M.extreme.104 <- define.matrix(Ts = in.list$Ts, 
+M.extreme.104 <- define.matrix.negbin(Ts = in.list$Ts, 
                                VT = in.list$VT, 
                                f = in.list$f, 
                                phi.1 = in.list$phi.1, 
