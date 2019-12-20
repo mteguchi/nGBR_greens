@@ -292,6 +292,7 @@ in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages an
                 phi.A = 0.95,
                 lambda = 1.04)
 
+set.seed(1234)
 # find the juvenile survival and transition probabilities
 estim.moderate.104 <- gosolnp(fun = obj.fcn.varstage,
                               ineqfun = eval_g0,
@@ -310,6 +311,8 @@ estim.moderate.104 <- gosolnp(fun = obj.fcn.varstage,
 Using these derived survival rates, we derive a Lefkovitch matrix using the negative binomial model. 
 
 ```{r}
+set.seed(1234)
+
 in.list$phi.J <- estim.moderate.104$pars
 M.moderate.104 <- define.matrix.varstage(Ts = in.list$Ts, 
                                          VT = in.list$VT, 
@@ -344,6 +347,8 @@ in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages an
                 phi.A = 0.95,
                 lambda = 1.04)
 
+set.seed(1234)
+
 # find the juvenile survival and transition probabilities
 estim.extreme.104 <- gosolnp(fun = obj.fcn.varstage,
                              ineqfun = eval_g0,
@@ -362,6 +367,8 @@ estim.extreme.104 <- gosolnp(fun = obj.fcn.varstage,
 Using these derived survival rates, we derive a Lefkovitch matrix using the negative binomial model. 
 
 ```{r}
+set.seed(1234)
+
 in.list$phi.J <- estim.extreme.104$pars
 M.extreme.104 <- define.matrix.varstage(Ts = in.list$Ts, 
                                         VT = in.list$VT, 
