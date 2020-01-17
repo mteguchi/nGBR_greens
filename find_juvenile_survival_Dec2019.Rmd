@@ -285,8 +285,8 @@ In the moderate-climate case scenarios, we set the sex ratio to be 0.88 and the 
 
 ```{r echo=FALSE, message=FALSE}
 # Define demographic parameters
-in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
-                VT =  c(1, 1, (1.9^2), 1), # variance of years in two juvenile stages 
+in.list <- list(Ts = c(5, 9, 10, 6),   # average years in two juvenile stages and subadults
+                VT =  c(1, (1.9^2), (1.9^2), 1), # variance of years in juvenile stages 
                 f =  c(68, 106.0 * 0.95), # prop breed and adult survival included 
                 phi.1 =  0.4,
                 phi.A = 0.95,
