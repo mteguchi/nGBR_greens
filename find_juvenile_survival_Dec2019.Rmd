@@ -31,7 +31,8 @@ Our model has 6 stages (email from NF on 2019-11-19)
 
 The following functions can be used to compute survival and transition probabilities using the negative binomial stage durations. This approach, however, creates pseudo stages within each stage so that the resulting matrix becomes large. I used the next approach (variable stage durations) in Caswell's book (6.4.3, p. 162) instead.  These functions have been moved to nGBR_greens_fcns.R 
 
-Functions to compute survival and transition probabilities using variable stage durations. p. 162 on Caswell's book. NOT DONE YET AS OF 12/19/2019. FINISH THIS. 
+Functions to compute survival and transition probabilities using variable stage durations. p. 162 on Caswell's book. 
+
 ```{r}
 # # Create a function to define Lefkovitch matrix using variable stage duration model. 
 # Ts is the stage durations of various juvenile stages in years (T in Caswell's book) - the last juvenile stage is to be maturing adults, so their fecundity is not zero.
@@ -140,10 +141,17 @@ After these years (10 years on average), turtles become subadults.
 
 These values come from Chaloupka (2002). 
 
+CCL: 65-91 cm
+
 #### Matruing adult: mean = 5 yrs, SD = 1 (Chaloupka 2002)
 
 We assumed 12% of maturing adults nest annually. (REF?)
 
+CCL: 91 - 97 cm
+
+#### Adult: 
+
+CCL : > 91 cm
 
 ### Survival rates
 
@@ -248,14 +256,14 @@ nests/female = 6.2  (Raine Is, Limpus et al 2003)
 
 remigation interval = 5.35 yr  (Raine Is, Limpus et al 2003)
 
-#### First year breeder (a.k.a., maturing adult)
-The fecundity for the maturing adult stage is computed as the following: Eggs/nest (103.9) x nests/female (6.2) x prop breed (0.12) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
+#### First time breeder (a.k.a., maturing adult)
+The fecundity for the maturing adult stage is computed as the following: Eggs/nest (103.9) x nests/female (6.2) x prop breed (0.12) x (1/remigration interval) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
 
 Proportion of breeding females is included.
 
-Modelrate climate: 103.9 x 6.2 x 0.12 x 0.88 = 68.0
+Modelrate climate:  103.9 * 6.2 * 0.4179 * (1/5.35) * 0.88 = `r 103.9 * 6.2 * 0.4179 * (1/5.35) * 0.88` 
 
-Extreme climate: 103.9 x 6.2 x 0.12 x 0.99 = 76.5
+Extreme climate: 103.9 * 6.2 * 0.4179 * (1/5.35) * 0.99 = `r 103.9 * 6.2 * 0.4179 * (1/5.35) * 0.99`
 
 #### Adult
 For the adults, we replace the proportion of the 1st year breeder that nest with the remigration interval: Eggs/nest x nests/female x (1/remigration interval) (1/5.35) x sex ratio
@@ -285,9 +293,12 @@ In the moderate-climate case scenarios, we set the sex ratio to be 0.88 and the 
 
 ```{r echo=FALSE, message=FALSE}
 # Define demographic parameters
+f1.moderate <- 103.9 * 6.2 * 0.4179 * (1/5.35) * 0.88
+f1.extreme <- 103.9 * 6.2 * 0.4179 * (1/5.35) * 0.99
+
 in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
                 VT =  c(1, 1, (1.9^2), 1), # variance of years in two juvenile stages 
-                f =  c(68, 106.0 * 0.95), # prop breed and adult survival included 
+                f =  c(f1.moderate, 106.0 * 0.95), # prop breed and adult survival included 
                 phi.1 =  0.4,
                 phi.A = 0.95,
                 lambda = 1.04)
@@ -342,7 +353,7 @@ In the extreme-climate case scenarios, we set the sex ratio to be 0.99 and the g
 # Define demographic parameters
 in.list <- list(Ts = c(5, 5, 19, 5),   # average years in two juvenile stages and subadults
                 VT =  c(1, 1, (1.9^2), 1),  # variance of years in two juvenile stages 
-                f =  c(76, 106 * 0.95), # 
+                f =  c(f1.extreme, 106 * 0.95), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
                 lambda = 1.04)
@@ -394,14 +405,20 @@ First year survival: 0.4
 Pelagic juvenile survival: 0.77
 Neritic juvenile survival: 0.84
 Subadult survival: 0.87
-Maturing adult: 0.88
-Adult: 0.95
+Maturing adult survival: 0.88
+Adult survival: 0.95
 
-First year breeder fertility: (eggs/nest) x (nests/female) x (prop.breed.) x sex ratio
+Sex ratios:
 
-Moderate climate: 103.9 x 6.2 x 0.12 x 0.88 = 68.0
+moderate climate: 88% female
 
-Extreme climate: 103.9 x 6.2 x 0.12 x 0.99 = 76.5
+extreme climate: 99% female
+
+First time breeder fertility: (eggs/nest) x (nests/female) x (prop.breed.) x (1/remigration interval) x sex ratio
+
+Moderate climate: 103.9 x 6.2 x 0.418 x (1/5.35) x 0.88 = 44.28
+
+Extreme climate: 103.9 x 6.2 x 0.418 x (1/5.35) x 0.99 = 49.82
 
 Adult fertility: (eggs/nest) x (nests/female) x (1/remigration interval) x sex ratio
 
@@ -409,11 +426,6 @@ Moderate climate: 103.9 x 6.2 x (1/5.35) x 0.88 = 106.0
 
 Extreme climate: 103.9 x 6.2 x (1/5.35) x 0.99 = 119.2
 
-Sex ratios:
-
-moderate climate: 88% female
-
-extreme climate: 99% female
 
 This gives us a 6 x 6 matrix. 
 Fecundity for the maturing adult is 68 x 0.88 (the survival rate of the maturing adult stage), whereas it is 106.0 x 0.95 for the adult stage under the moderate climate scenario. 
