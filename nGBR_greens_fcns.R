@@ -1,4 +1,87 @@
 
+# Functions to compute survival and transition probabilities using variable stage durations. p. 162 on Caswell's book. 
+# 
+# # # Create a function to define Lefkovitch matrix using variable stage duration model. 
+# # Ts is the stage durations of various juvenile stages in years (T in Caswell's book) - the last juvenile stage is to be maturing adults, so their fecundity is not zero.
+# 
+# VT is a vector of variances of stage durations
+# 
+# f is a vector of fecundities, which include the survival of adults  and proportion that breeds: only two are allowed, where only maturing adults (MA) and adults (A) breed. For the maturing adults, the survival rate is incorporated (multiplied) during the calculation. 
+# 
+# phi.1 is the survival rate of the first year (eggs, hatchlings, and first year)
+# 
+# phi.J includes pelagic juvenile, neritic juvenile, subadult, and maturing adult stages. 
+# 
+
+define.matrix.varstage <- function(Ts, VT, f, phi.1, phi.J, phi.A, lambda){
+  
+  d.lambda <- 0.5
+  
+  while(d.lambda > 0.001){
+    a <- log(lambda/phi.J)
+    gam <- (1/Ts) * exp(-a * ((Ts/2) - (VT/(2*Ts))))
+    
+    M.dim <- length(phi.J) + length(phi.A) + 1
+    # (juvenile + subadult stages + maturing adults) + adult stages (length of survival) + first year
+    M <- matrix(data = 0, 
+                nrow = M.dim, 
+                ncol = M.dim)
+    
+    # the maturing adult stage needs to reproduce (Caswell 2001, p. 165)
+    # fertility needs adult survival for the post-breeding census
+    M[1, M.dim] <- f[length(f)]   # adults
+    
+    # fertility for maturing adults needs the final juvenile stage suvival
+    M[1, (M.dim - 1)] <- f[1] * phi.J[length(phi.J)]  
+    
+    # first-year survival
+    M[2, 1] <- phi.1
+    
+    # adult survival at the end
+    M[M.dim, M.dim] <- phi.A
+    
+    # fill in two rows for each column staying (1 - gam) and leaving (gam)
+    l <- 1  
+    for (j in 2:(M.dim-1)){
+      M[j, j] <- phi.J[j-1] * (1 - gam[j-1])
+      M[(j+1), j] <- phi.J[j-1] * gam[j-1]
+      
+    }
+    
+    # compute eigenvalues
+    eig1 <- eigen(M)
+    
+    d.lambda <- abs(eig1$values[1] - lambda)
+    lambda <- eig1$values[1]
+  }
+  
+  
+  # return stuff.
+  return(list(a = a,
+              gam = gam,
+              phi.J = phi.J,
+              M = M,
+              eigen1 = eig1$values[1]))
+}
+
+
+obj.fcn.varstage <- function(x){
+  M <- define.matrix.varstage(Ts = in.list$Ts, 
+                              VT = in.list$VT, 
+                              f = in.list$f, 
+                              phi.1 = in.list$phi.1, 
+                              phi.J = x, 
+                              phi.A = in.list$phi.A,
+                              lambda = 1.0)
+  
+  eig.1 <- M$eigen1
+  
+  return(abs(eig.1 - in.list$lambda))
+}
+
+
+
+
 # Create a function to define Lefkovitch matrix using the negative binomial stage duration model. 
 # Ts is the stage durations of various juvenile stages in years (T in Caswell's book) - the last juvenile stage is to be maturing adults, so their fecundity is not zero.
 # 
