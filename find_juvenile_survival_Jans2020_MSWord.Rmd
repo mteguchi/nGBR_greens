@@ -15,7 +15,7 @@ rm(list=ls())
 library(Rsolnp)
 library(tidyverse)
 source("nGBR_greens_fcns.R")
-save.file <- TRUE #FALSE
+save.file <- TRUE #FALSE #
 ```
 
 Define functions first. 
@@ -173,13 +173,13 @@ nests/female = 6.2  (Raine Is, Limpus et al 2003)
 remigation interval = 5.35 yr  (Raine Is, Limpus et al 2003)
 
 #### First year breeder (a.k.a., maturing adult)
-The fecundity for the maturing adult stage is computed as the following: Eggs/nest (103.9) x nests/female (6.2) x prop breed (0.12) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
+The fecundity for the maturing adult stage is computed as the following: Eggs/nest (103.9) x nests/female (6.2) x prop breed (0.382) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
 
 Proportion of breeding females is included.
 
-Modelrate climate: 103.9 x 6.2 x 0.12 x 0.88 = 68.0
+Modelrate climate: 103.9 x 6.2 x 0.382 x 0.88 = 216.55
 
-Extreme climate: 103.9 x 6.2 x 0.12 x 0.99 = 76.5
+Extreme climate: 103.9 x 6.2 x 0.382 x 0.99 = 243.62
 
 #### Adult
 For the adults, we replace the proportion of the 1st year breeder that nest with the remigration interval: Eggs/nest x nests/female x (1/remigration interval) (1/5.35) x sex ratio
@@ -211,7 +211,7 @@ Ts <- c(4, 10.3, 9.25, 5)  # average years in two juvenile stages and subadults
 VT <- c(1, 2^2, 2^2, 1) # variance of years in juvenile stages 
 in.list <- list(Ts = Ts,   
                 VT =  VT, 
-                f =  c(68, 106.0 * 0.95), # prop breed and adult survival included 
+                f =  c(216.55, 106.0), # includes prop breed but no survival included
                 phi.1 =  0.4,
                 phi.A = 0.95,
                 lambda = 1.04)
@@ -248,7 +248,7 @@ M.moderate.104 <- define.matrix.varstage(Ts = in.list$Ts,
 
 if (save.file)
   write.table(M.moderate.104$M, 
-              file = "data/Moderate_104.csv",
+              file = paste0("data/Moderate_104_", Sys.Date(), ".csv"),
               row.names = F,
               col.names = FALSE,
               sep = ",")
@@ -265,7 +265,7 @@ In the extreme-climate case scenarios, we set the sex ratio to be 0.99 and the g
 # Define demographic parameters
 in.list <- list(Ts = Ts,   # average years in two juvenile stages and subadults
                 VT =  VT,  # variance of years in two juvenile stages 
-                f =  c(76.5, 119.2 * 0.95), # 
+                f =  c(243.62, 119.2), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
                 lambda = 1.04)
@@ -273,12 +273,12 @@ in.list <- list(Ts = Ts,   # average years in two juvenile stages and subadults
 set.seed(1234)
 
 # find the juvenile survival and transition probabilities
-estim.extreme.104 <- gosolnp(fun = obj.fcn.varstage,
-                             ineqfun = eval_g0,
-                             LB = c(0.1, 0.1, 0.3, 0.5), 
-                             UB = c(0.8, 0.9, 0.95, 0.95),
-                             ineqLB = c(-1.0, -1.0, -1.0),
-                             ineqUB = c(0.0, 0.0, 0.0),
+estim.extreme.104 <- gosolnp(fun = obj.fcn.varstage,  # in nGBR_greens_fcns.R
+                             ineqfun = eval_g0,       # in nGBR_greens_fcns.R; consecutive phi is increasing
+                             LB = c(0.1, 0.1, 0.3, 0.5),  # lower and upper bounds of survival for 
+                             UB = c(0.8, 0.9, 0.95, 0.95),  # juvenile stages including maturing adults
+                             ineqLB = c(-1.0, -1.0, -1.0),  # -1 < phi[t-1] - phi[t] < 0
+                             ineqUB = c(0.0, 0.0, 0.0),     # -1 < phi[t-1] - phi[t] < 0
                              distr = c(1,1,1,1),
                              control = list(outer.iter = 5000,
                                             inner.iter = 10000,
@@ -303,7 +303,7 @@ M.extreme.104 <- define.matrix.varstage(Ts = in.list$Ts,
 
 if (save.file) 
   write.table(M.extreme.104$M, 
-              file = "data/Extreme_104.csv",
+              file = paste0("data/Extreme_104_", Sys.Date(), ".csv"),
               row.names = F,
               col.names = FALSE,
               sep = ",")
