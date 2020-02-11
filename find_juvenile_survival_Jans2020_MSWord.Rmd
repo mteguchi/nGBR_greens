@@ -173,13 +173,13 @@ nests/female = 6.2  (Raine Is, Limpus et al 2003)
 remigation interval = 5.35 yr  (Raine Is, Limpus et al 2003)
 
 #### First year breeder (a.k.a., maturing adult)
-The fecundity for the maturing adult stage is computed as the following: Eggs/nest (103.9) x nests/female (6.2) x prop breed (0.382) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
+The fecundity for the maturing adult stage is computed as the following: Eggs/nest (103.9) x nests/female (6.2) x prop breed (0.382) x (1/remigation interval) x sex ratio (see below). This is also an unknown as the maturing adult survival rate is unknown.  
 
 Proportion of breeding females is included.
 
-Modelrate climate: 103.9 x 6.2 x 0.382 x 0.88 = 216.55
+Modelrate climate: 103.9 x 6.2 x 0.382 x (1/5.35) x 0.88 = 40.476
 
-Extreme climate: 103.9 x 6.2 x 0.382 x 0.99 = 243.62
+Extreme climate: 103.9 x 6.2 x 0.382 x (1/5.35) x 0.99 = 45.536
 
 #### Adult
 For the adults, we replace the proportion of the 1st year breeder that nest with the remigration interval: Eggs/nest x nests/female x (1/remigration interval) (1/5.35) x sex ratio
@@ -211,7 +211,7 @@ Ts <- c(4, 10.3, 9.25, 5)  # average years in two juvenile stages and subadults
 VT <- c(1, 2^2, 2^2, 1) # variance of years in juvenile stages 
 in.list <- list(Ts = Ts,   
                 VT =  VT, 
-                f =  c(216.55, 106.0), # includes prop breed but no survival included
+                f =  c(40.476, 106.0), # includes prop breed but no survival included
                 phi.1 =  0.4,
                 phi.A = 0.95,
                 lambda = 1.04)
@@ -265,7 +265,7 @@ In the extreme-climate case scenarios, we set the sex ratio to be 0.99 and the g
 # Define demographic parameters
 in.list <- list(Ts = Ts,   # average years in two juvenile stages and subadults
                 VT =  VT,  # variance of years in two juvenile stages 
-                f =  c(243.62, 119.2), # 
+                f =  c(45.536, 119.2), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
                 lambda = 1.04)
