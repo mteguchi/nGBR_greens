@@ -16,6 +16,8 @@ library(Rsolnp)
 library(tidyverse)
 source("nGBR_greens_fcns.R")
 save.file <- TRUE #FALSE #
+
+lambda <- 1.02
 ```
 
 Define functions first. 
@@ -214,7 +216,7 @@ in.list <- list(Ts = Ts,
                 f =  c(40.476, 106.0), # includes prop breed but no survival included
                 phi.1 =  0.4,
                 phi.A = 0.95,
-                lambda = 1.04)
+                lambda = lambda)
 
 set.seed(1234)
 # find the juvenile survival and transition probabilities
@@ -238,17 +240,18 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the vari
 set.seed(1234)
 
 in.list$phi.J <- estim.moderate.104$pars
-M.moderate.104 <- define.matrix.varstage(Ts = in.list$Ts, 
-                                         VT = in.list$VT, 
-                                         f = in.list$f, 
-                                         phi.1 = in.list$phi.1, 
-                                         phi.J = in.list$phi.J, 
-                                         phi.A = in.list$phi.A,
-                                         lambda = 1.04)
+M.moderate <- define.matrix.varstage(Ts = in.list$Ts, 
+                                     VT = in.list$VT, 
+                                     f = in.list$f, 
+                                     phi.1 = in.list$phi.1, 
+                                     phi.J = in.list$phi.J, 
+                                     phi.A = in.list$phi.A,
+                                     lambda = lambda)
 
 if (save.file)
-  write.table(M.moderate.104$M, 
-              file = paste0("data/Moderate_104_", Sys.Date(), ".csv"),
+  write.table(M.moderate$M, 
+              file = paste0("data/Moderate_1", unlist(strsplit(as.character(lambda), "1."))[2],
+                            "_", Sys.Date(), ".csv"),
               row.names = F,
               col.names = FALSE,
               sep = ",")
@@ -268,22 +271,22 @@ in.list <- list(Ts = Ts,   # average years in two juvenile stages and subadults
                 f =  c(45.536, 119.2), # 
                 phi.1 =  0.4,
                 phi.A = 0.95,
-                lambda = 1.04)
+                lambda = lambda)
 
 set.seed(1234)
 
 # find the juvenile survival and transition probabilities
-estim.extreme.104 <- gosolnp(fun = obj.fcn.varstage,  # in nGBR_greens_fcns.R
-                             ineqfun = eval_g0,       # in nGBR_greens_fcns.R; consecutive phi is increasing
-                             LB = c(0.1, 0.1, 0.3, 0.5),  # lower and upper bounds of survival for 
-                             UB = c(0.8, 0.9, 0.95, 0.95),  # juvenile stages including maturing adults
-                             ineqLB = c(-1.0, -1.0, -1.0),  # -1 < phi[t-1] - phi[t] < 0
-                             ineqUB = c(0.0, 0.0, 0.0),     # -1 < phi[t-1] - phi[t] < 0
-                             distr = c(1,1,1,1),
-                             control = list(outer.iter = 5000,
-                                            inner.iter = 10000,
-                                            tol = 1.0e-15,
-                                            delta = 1.0e-12))
+estim.extreme <- gosolnp(fun = obj.fcn.varstage,  # in nGBR_greens_fcns.R
+                         ineqfun = eval_g0,       # in nGBR_greens_fcns.R; consecutive phi is increasing
+                         LB = c(0.1, 0.1, 0.3, 0.5),  # lower and upper bounds of survival for 
+                         UB = c(0.8, 0.9, 0.95, 0.95),  # juvenile stages including maturing adults
+                         ineqLB = c(-1.0, -1.0, -1.0),  # -1 < phi[t-1] - phi[t] < 0
+                         ineqUB = c(0.0, 0.0, 0.0),     # -1 < phi[t-1] - phi[t] < 0
+                         distr = c(1,1,1,1),
+                         control = list(outer.iter = 5000,
+                                        inner.iter = 10000,
+                                        tol = 1.0e-15,
+                                        delta = 1.0e-12))
 
 ```
 
@@ -292,18 +295,19 @@ Using these derived survival rates, we derive a Lefkovitch matrix using the vari
 ```{r message = F}
 set.seed(1234)
 
-in.list$phi.J <- estim.extreme.104$pars
-M.extreme.104 <- define.matrix.varstage(Ts = in.list$Ts, 
-                                        VT = in.list$VT, 
-                                        f = in.list$f, 
-                                        phi.1 = in.list$phi.1, 
-                                        phi.J = in.list$phi.J, 
-                                        phi.A = in.list$phi.A,
-                                        lambda = 1.04)
+in.list$phi.J <- estim.extreme$pars
+M.extreme <- define.matrix.varstage(Ts = in.list$Ts, 
+                                    VT = in.list$VT, 
+                                    f = in.list$f, 
+                                    phi.1 = in.list$phi.1, 
+                                    phi.J = in.list$phi.J, 
+                                    phi.A = in.list$phi.A,
+                                    lambda = lambda)
 
 if (save.file) 
-  write.table(M.extreme.104$M, 
-              file = paste0("data/Extreme_104_", Sys.Date(), ".csv"),
+  write.table(M.extreme$M, 
+              file = paste0("data/Extreme_1", unlist(strsplit(as.character(lambda), "1."))[2],
+                            "_", Sys.Date(), ".csv"),
               row.names = F,
               col.names = FALSE,
               sep = ",")
